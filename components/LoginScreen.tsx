@@ -1,40 +1,43 @@
 "use client";
 
 import { useState } from "react";
-import { signIn, signUp } from "@/lib/auth";
+import { signIn, signUp, checkId } from "@/lib/auth";
 
 // 로그인 / 회원가입 화면
 export default function LoginScreen() {
   const [mode, setMode] = useState<"login" | "signup">("login");
-  const [email, setEmail] = useState("");
+  const [id, setId] = useState("");
   const [password, setPassword] = useState("");
+  const [showPw, setShowPw] = useState(false); // 비밀번호 보기 여부
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   async function submit() {
     setError("");
-    const em = email.trim();
-    if (!em || !password) {
-      setError("아이디와 비밀번호를 모두 입력해주세요.");
+    // 1) 아이디 형식 확인 (한글/빈칸 등 걸러내기)
+    const idError = checkId(id);
+    if (idError) {
+      setError(idError);
       return;
     }
+    // 2) 비밀번호 길이 확인
     if (password.length < 6) {
       setError("비밀번호는 6자 이상으로 만들어주세요.");
       return;
     }
     setBusy(true);
     try {
-      const { error } = mode === "login" ? await signIn(em, password) : await signUp(em, password);
+      const { error } = mode === "login" ? await signIn(id, password) : await signUp(id, password);
       if (error) {
         const msg = (error.message || "").toLowerCase();
         if (mode === "signup" && msg.includes("already")) {
           setError("이미 있는 아이디예요. 위에서 '로그인'을 눌러 들어가세요.");
-        } else if (msg.includes("valid email") || msg.includes("email")) {
-          setError("아이디는 이메일 형식으로 적어주세요. (예: 우리가족@gmail.com)");
         } else if (mode === "login") {
-          setError("로그인에 실패했어요. 아이디·비밀번호를 다시 확인해주세요.");
+          setError(
+            "아이디 또는 비밀번호가 맞지 않아요. 회원가입할 때 만든 것과 똑같이(오타 없이) 입력했는지 확인해주세요."
+          );
         } else {
-          setError("회원가입에 실패했어요. 다시 시도해주세요.");
+          setError("회원가입에 실패했어요. 잠시 후 다시 시도해주세요.");
         }
       }
       // 성공하면 상위 화면(page.tsx)이 로그인 상태를 감지해 자동으로 앱으로 바뀝니다.
@@ -78,17 +81,18 @@ export default function LoginScreen() {
 
       <div className="space-y-4 rounded-3xl border-2 border-green-200 bg-white p-6 shadow-sm">
         <div>
-          <p className="mb-2 text-lg font-bold">
-            아이디 <span className="text-base font-normal text-gray-500">(이메일)</span>
-          </p>
+          <p className="mb-1 text-lg font-bold">아이디</p>
+          <p className="mb-2 text-base text-gray-500">영어·숫자로 만들어요 (예: gimhealth)</p>
           <input
-            type="email"
-            inputMode="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="예: 우리가족@gmail.com"
+            type="text"
+            value={id}
+            onChange={(e) => setId(e.target.value)}
+            placeholder="예: gimhealth 또는 19501225"
             className={inputCls}
             autoComplete="username"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
           />
         </div>
         <div>
@@ -96,13 +100,21 @@ export default function LoginScreen() {
             비밀번호 <span className="text-base font-normal text-gray-500">(6자 이상)</span>
           </p>
           <input
-            type="password"
+            type={showPw ? "text" : "password"}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="비밀번호"
             className={inputCls}
             autoComplete={mode === "login" ? "current-password" : "new-password"}
           />
+          {/* 비밀번호 보기 (오타 방지) */}
+          <button
+            type="button"
+            onClick={() => setShowPw((v) => !v)}
+            className="mt-2 text-lg font-semibold text-green-700 underline"
+          >
+            {showPw ? "🙈 비밀번호 숨기기" : "👁 비밀번호 보기"}
+          </button>
         </div>
 
         {error && (

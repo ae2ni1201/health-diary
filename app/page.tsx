@@ -182,7 +182,9 @@ export default function Home() {
     <main className="mx-auto max-w-2xl px-4 py-5">
       {/* 상단: 로그인 계정 + 글자크기(+/-) + 로그아웃 */}
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <span className="max-w-[40%] truncate text-sm text-gray-500">👤 {session.user.email}</span>
+        <span className="max-w-[40%] truncate text-sm text-gray-500">
+          👤 {session.user.email?.replace("@geonghealth.app", "")}
+        </span>
         <div className="flex items-center gap-2">
           <button
             type="button"
