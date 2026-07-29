@@ -9,10 +9,12 @@ export default function Calendar({
   selectedDate,
   onSelectDate,
   datesWithRecords,
+  datesWithAppt,
 }: {
   selectedDate: string; // "2026-07-29"
   onSelectDate: (date: string) => void;
-  datesWithRecords: Set<string>; // 기록이 있는 날짜들
+  datesWithRecords: Set<string>; // 통증 기록이 있는 날 (주황 점)
+  datesWithAppt: Set<string>; // 병원 예약이 있는 날 (파란 점)
 }) {
   // 화면에 보여줄 달 (처음엔 선택한 날짜의 달)
   const [sy, sm] = selectedDate.split("-").map(Number);
@@ -88,6 +90,7 @@ export default function Calendar({
           const isSelected = dateStr === selectedDate;
           const isToday = dateStr === todayStr;
           const hasRecord = datesWithRecords.has(dateStr);
+          const hasAppt = datesWithAppt.has(dateStr);
           const dow = idx % 7;
           return (
             <button
@@ -112,15 +115,24 @@ export default function Calendar({
               >
                 {d}
               </span>
-              {/* 기록이 있는 날엔 아래에 점 */}
-              <span
-                className={`mt-1 h-2 w-2 rounded-full ${
-                  hasRecord ? "bg-orange-500" : "bg-transparent"
-                }`}
-              />
+              {/* 점: 주황=통증기록, 파랑=병원예약 */}
+              <span className="mt-1 flex h-2 items-center justify-center gap-0.5">
+                {hasRecord && <span className="h-2 w-2 rounded-full bg-orange-500" />}
+                {hasAppt && <span className="h-2 w-2 rounded-full bg-blue-500" />}
+              </span>
             </button>
           );
         })}
+      </div>
+
+      {/* 점 설명 */}
+      <div className="mt-2 flex justify-center gap-4 text-sm text-gray-500">
+        <span className="flex items-center gap-1">
+          <span className="h-2 w-2 rounded-full bg-orange-500" /> 통증 기록
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="h-2 w-2 rounded-full bg-blue-500" /> 병원 예약
+        </span>
       </div>
     </div>
   );

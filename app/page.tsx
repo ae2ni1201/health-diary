@@ -8,11 +8,21 @@ import {
   todayString,
   type PainRecord,
 } from "@/lib/painStore";
+import {
+  getAppointments,
+  addAppointment,
+  deleteAppointment,
+  getDueReminders,
+  type Appointment,
+  type Reminder,
+} from "@/lib/appointments";
 import Calendar from "@/components/Calendar";
 import PainForm from "@/components/PainForm";
 import PainList from "@/components/PainList";
+import AppointmentForm from "@/components/AppointmentForm";
+import AppointmentList from "@/components/AppointmentList";
+import HospitalMap from "@/components/HospitalMap";
 
-// 글자 크기 최소/최대 (px)
 const MIN_FONT = 16;
 const MAX_FONT = 30;
 
@@ -24,26 +34,69 @@ function dateLabelKo(dateStr: string) {
   return `${m}월 ${d}일 (${dow})`;
 }
 
-export default function Home() {
-  const [records, setRecords] = useState<PainRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState(""); // "2026-07-29"
-  const [fontPx, setFontPx] = useState(18);
+// "14:30" → "오후 2시 30분"
+function timeKo(t: string) {
+  if (!t) return "";
+  const [h, m] = t.split(":").map(Number);
+  const ampm = h < 12 ? "오전" : "오후";
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return m ? `${ampm} ${h12}시 ${m}분` : `${ampm} ${h12}시`;
+}
 
-  // 저장된 기록을 다시 불러옵니다.
-  async function reload() {
-    setRecords(await getRecords());
+// 알림 문구 만들기
+function reminderText(r: Reminder) {
+  const t = r.appt.time ? ` ${timeKo(r.appt.time)}` : "";
+  const h = r.appt.hospital ? ` (${r.appt.hospital})` : "";
+  if (r.kind === "today") return `오늘${t} 병원 예약이 있어요! 잊지 마세요.${h}`;
+  if (r.kind === "day") return `내일${t} 병원 예약이 있어요.${h}`;
+  return `일주일 후${t} 병원 예약이 있어요.${h}`;
+}
+
+export default function Home() {
+  const [tab, setTab] = useState<"diary" | "map">("diary");
+  const [records, setRecords] = useState<PainRecord[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [reminders, setReminders] = useState<Reminder[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedDate, setSelectedDate] = useState("");
+  const [fontPx, setFontPx] = useState(18);
+  // 아래 입력 화면 모드: null(버튼만) | "pain"(통증 기록) | "appointment"(예약 등록)
+  const [addMode, setAddMode] = useState<null | "pain" | "appointment">(null);
+
+  // 통증 기록 + 예약을 모두 불러오고, 알림을 확인합니다.
+  async function loadAll() {
+    const [pains, appts] = await Promise.all([getRecords(), getAppointments()]);
+    setRecords(pains);
+    setAppointments(appts);
+
+    // 알림 확인 (일주일 전 / 하루 전 / 당일)
+    const due = getDueReminders(appts, todayString());
+    setReminders(due);
+    // 허용된 경우 브라우저 알림 (예약+종류별로 한 번만)
+    if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+      for (const r of due) {
+        const key = `geongang-ilgi.notified.${r.appt.id}.${r.kind}`;
+        if (!window.localStorage.getItem(key)) {
+          try {
+            new Notification("건강일기 · 병원 예약 알림", { body: reminderText(r) });
+          } catch {
+            /* 무시 */
+          }
+          window.localStorage.setItem(key, "1");
+        }
+      }
+    }
   }
 
-  // 처음 열릴 때: 오늘 날짜 선택 + 저장된 글자크기 적용 + 기록 불러오기
+  // 처음 열릴 때
   useEffect(() => {
     setSelectedDate(todayString());
     const savedFont = Number(window.localStorage.getItem("geongang-ilgi.fontPx"));
     if (savedFont) setFontPx(savedFont);
-    reload().finally(() => setLoading(false));
+    loadAll().finally(() => setLoading(false));
   }, []);
 
-  // 글자 크기 적용 (화면 전체 글씨) + 저장
+  // 글자 크기 적용 + 저장
   useEffect(() => {
     document.documentElement.style.fontSize = `${fontPx}px`;
     window.localStorage.setItem("geongang-ilgi.fontPx", String(fontPx));
@@ -56,8 +109,8 @@ export default function Home() {
     setFontPx((p) => Math.min(MAX_FONT, p + 2));
   }
 
-  // 새 기록 저장 (날짜는 달력에서 고른 날)
-  async function handleAdd(input: {
+  // 통증 기록 저장/삭제
+  async function handleAddPain(input: {
     bodyPart: string;
     painType: string;
     level: number;
@@ -65,30 +118,43 @@ export default function Home() {
     memo: string;
   }) {
     await addRecord({ date: selectedDate, ...input });
-    await reload();
+    await loadAll();
   }
-
-  async function handleDelete(id: string) {
+  async function handleDeletePain(id: string) {
     await deleteRecord(id);
-    await reload();
+    await loadAll();
   }
 
-  // 기록이 있는 날짜들 (달력에 점 표시용)
+  // 예약 저장/삭제
+  async function handleAddAppt(input: { date: string; time: string; hospital: string; memo: string }) {
+    await addAppointment(input);
+    await loadAll();
+    setAddMode(null); // 저장 후 닫기
+  }
+  async function handleDeleteAppt(id: string) {
+    await deleteAppointment(id);
+    await loadAll();
+  }
+
+  // 달력 점 + 선택 날짜 데이터
   const datesWithRecords = new Set(records.map((r) => r.date));
-  // 선택한 날짜의 기록만
+  const datesWithAppt = new Set(appointments.map((a) => a.date));
   const selectedRecords = records.filter((r) => r.date === selectedDate);
+  const selectedAppts = appointments.filter((a) => a.date === selectedDate);
+
+  const btnFont =
+    "rounded-xl border-2 border-green-600 px-5 py-2 text-2xl font-bold disabled:opacity-30";
 
   return (
-    <main className="mx-auto max-w-2xl px-4 py-6">
-      {/* 글자 크기 조절 (상단, +/-) */}
-      <div className="mb-4 flex flex-wrap items-center justify-center gap-3 rounded-2xl border-2 border-green-200 bg-white p-3">
-        <span className="text-base font-bold text-gray-600">🔠 글자 크기</span>
+    <main className="mx-auto max-w-2xl px-4 py-5">
+      {/* 글자 크기 (+/-) — 우측 상단 */}
+      <div className="mb-3 flex items-center justify-end gap-2">
         <button
           type="button"
           onClick={decFont}
           disabled={fontPx <= MIN_FONT}
           aria-label="글자 작게"
-          className="rounded-xl border-2 border-green-600 bg-white px-5 py-2 text-2xl font-bold text-green-700 hover:bg-green-50 disabled:opacity-30"
+          className={`${btnFont} bg-white text-green-700 hover:bg-green-50`}
         >
           가－
         </button>
@@ -97,61 +163,146 @@ export default function Home() {
           onClick={incFont}
           disabled={fontPx >= MAX_FONT}
           aria-label="글자 크게"
-          className="rounded-xl border-2 border-green-600 bg-green-600 px-5 py-2 text-2xl font-bold text-white hover:bg-green-700 disabled:opacity-30"
+          className={`${btnFont} bg-green-600 text-white hover:bg-green-700`}
         >
           가＋
         </button>
       </div>
 
-      {/* 제목 */}
-      <header className="mb-4 text-center">
-        <h1 className="text-3xl font-extrabold text-green-700">📔 건강일기</h1>
-        <p className="mt-1 text-lg text-gray-600">날짜를 눌러 통증을 기록해요</p>
-      </header>
-
-      {/* 의료 면책 안내 */}
-      <div className="mb-4 rounded-2xl border-2 border-amber-300 bg-amber-50 p-3">
-        <p className="text-base text-amber-900">
-          ⚠️ 이 서비스는 <b>의료 조언을 대신하지 않아요.</b> 정확한 진단은 의료진과 상담하세요. 위급 시 <b>119</b>.
-        </p>
+      {/* 탭: 건강일기 / 병원 지도 */}
+      <div className="mb-4 grid grid-cols-2 gap-2 rounded-2xl bg-green-100 p-1">
+        <button
+          type="button"
+          onClick={() => setTab("diary")}
+          className={`rounded-xl py-3 text-xl font-bold ${
+            tab === "diary" ? "bg-green-600 text-white shadow" : "text-green-800"
+          }`}
+        >
+          📔 건강일기
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("map")}
+          className={`rounded-xl py-3 text-xl font-bold ${
+            tab === "map" ? "bg-green-600 text-white shadow" : "text-green-800"
+          }`}
+        >
+          🗺️ 병원 지도
+        </button>
       </div>
 
-      {!selectedDate ? (
+      {/* 예약 알림 배너 */}
+      {reminders.length > 0 && (
+        <div className="mb-4 space-y-2">
+          {reminders.map((r, i) => (
+            <div key={i} className="rounded-2xl border-2 border-blue-300 bg-blue-50 p-4">
+              <p className="text-lg font-bold text-blue-900">🔔 {reminderText(r)}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {tab === "map" ? (
+        <HospitalMap />
+      ) : !selectedDate ? (
         <p className="py-10 text-center text-xl text-gray-500">불러오는 중...</p>
       ) : (
         <>
           {/* 달력 */}
           <Calendar
             selectedDate={selectedDate}
-            onSelectDate={setSelectedDate}
+            onSelectDate={(d) => {
+              setSelectedDate(d);
+              setAddMode(null);
+            }}
             datesWithRecords={datesWithRecords}
+            datesWithAppt={datesWithAppt}
           />
 
           {/* 선택한 날짜의 기록 (달력 바로 아래) */}
           <section className="mt-6">
-            <h2 className="mb-4 text-2xl font-bold">
+            <h2 className="mb-3 text-2xl font-bold">
               {dateLabelKo(selectedDate)} 기록{" "}
-              <span className="text-xl text-gray-500">({selectedRecords.length}개)</span>
+              <span className="text-xl text-gray-500">
+                ({selectedRecords.length + selectedAppts.length}개)
+              </span>
             </h2>
             {loading ? (
-              <p className="py-8 text-center text-xl text-gray-500">기록을 불러오는 중...</p>
+              <p className="py-8 text-center text-xl text-gray-500">불러오는 중...</p>
+            ) : selectedRecords.length === 0 && selectedAppts.length === 0 ? (
+              <div className="rounded-2xl border-2 border-dashed border-green-300 bg-white p-8 text-center">
+                <p className="text-xl text-gray-500">
+                  이 날은 기록이 없어요.
+                  <br />
+                  아래 버튼으로 통증이나 예약을 남겨보세요.
+                </p>
+              </div>
             ) : (
-              <PainList records={selectedRecords} onDelete={handleDelete} />
+              <>
+                {selectedAppts.length > 0 && (
+                  <AppointmentList appointments={selectedAppts} onDelete={handleDeleteAppt} />
+                )}
+                {selectedRecords.length > 0 && (
+                  <PainList records={selectedRecords} onDelete={handleDeletePain} />
+                )}
+              </>
             )}
           </section>
 
-          {/* 기록 추가 폼 (맨 아래) */}
-          <section className="mt-8 rounded-3xl border-2 border-green-200 bg-white p-5 shadow-sm sm:p-6">
-            <h2 className="mb-5 text-2xl font-bold">
-              <span className="text-green-700">{dateLabelKo(selectedDate)}</span> 기록하기
-            </h2>
-            <PainForm onAdd={handleAdd} />
-          </section>
+          {/* 통증 기록 / 예약 등록 버튼 + 입력 화면 */}
+          {addMode === null && (
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setAddMode("pain")}
+                className="rounded-2xl bg-green-600 py-5 text-xl font-bold text-white hover:bg-green-700"
+              >
+                🩹 통증 기록
+              </button>
+              <button
+                type="button"
+                onClick={() => setAddMode("appointment")}
+                className="rounded-2xl bg-blue-600 py-5 text-xl font-bold text-white hover:bg-blue-700"
+              >
+                🏥 예약일 등록
+              </button>
+            </div>
+          )}
+
+          {addMode === "pain" && (
+            <section className="mt-6 rounded-3xl border-2 border-green-200 bg-white p-5 shadow-sm">
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="text-2xl font-bold">
+                  <span className="text-green-700">{dateLabelKo(selectedDate)}</span> 통증 기록
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setAddMode(null)}
+                  className="rounded-lg border-2 border-gray-300 px-3 py-1 text-base font-bold text-gray-600 hover:bg-gray-50"
+                >
+                  닫기
+                </button>
+              </div>
+              <PainForm onAdd={handleAddPain} />
+            </section>
+          )}
+
+          {addMode === "appointment" && (
+            <section className="mt-6 rounded-3xl border-2 border-blue-200 bg-white p-5 shadow-sm">
+              <h2 className="mb-4 text-2xl font-bold text-blue-700">🏥 병원 예약 등록</h2>
+              <AppointmentForm
+                defaultDate={selectedDate}
+                onAdd={handleAddAppt}
+                onCancel={() => setAddMode(null)}
+              />
+            </section>
+          )}
         </>
       )}
 
-      <footer className="mt-10 text-center text-base text-gray-400">
-        건강일기 · 통증 기록 일지
+      {/* 작은 의료 면책 안내 (노란 박스 대신) */}
+      <footer className="mt-10 text-center text-sm text-gray-400">
+        이 서비스는 의료 조언을 대신하지 않아요 · 위급 시 119
       </footer>
     </main>
   );

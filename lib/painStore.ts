@@ -27,7 +27,7 @@ export function todayString(): string {
 }
 
 // 이 기기를 구분하는 무작위 번호를 가져옵니다. (없으면 새로 만들어 저장)
-function getDeviceId(): string {
+export function getDeviceId(): string {
   if (typeof window === "undefined") return "";
   let id = window.localStorage.getItem("geongang-ilgi.deviceId");
   if (!id) {
