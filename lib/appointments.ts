@@ -1,7 +1,7 @@
 // lib/appointments.ts
-// 병원 예약을 Supabase에 저장/불러오기 하는 도우미 코드입니다.
+// 병원 예약을 Supabase에 저장/불러오기 합니다. (로그인 계정 기준)
 import { supabase } from "./supabase";
-import { getDeviceId, ymd } from "./painStore";
+import { ymd } from "./painStore";
 
 // 예약 한 개의 모양
 export type Appointment = {
@@ -33,13 +33,11 @@ function toAppt(row: Row): Appointment {
   };
 }
 
-// 내 예약을 모두 불러옵니다. (가까운 날짜 순)
+// 내 예약을 모두 불러옵니다. (가까운 날짜 순, RLS가 내 것만 걸러줌)
 export async function getAppointments(): Promise<Appointment[]> {
-  const deviceId = getDeviceId();
   const { data, error } = await supabase
     .from("appointments")
     .select("*")
-    .eq("device_id", deviceId)
     .order("appt_date", { ascending: true });
   if (error) {
     console.error("예약 불러오기 실패:", error.message);
@@ -48,16 +46,14 @@ export async function getAppointments(): Promise<Appointment[]> {
   return (data as Row[]).map(toAppt);
 }
 
-// 새 예약을 저장합니다.
+// 새 예약을 저장합니다. (user_id는 DB가 자동으로 로그인 계정으로 채웁니다)
 export async function addAppointment(input: {
   date: string;
   time: string;
   hospital: string;
   memo: string;
 }): Promise<void> {
-  const deviceId = getDeviceId();
   const { error } = await supabase.from("appointments").insert({
-    device_id: deviceId,
     appt_date: input.date,
     appt_time: input.time || null,
     hospital: input.hospital || null,
@@ -86,7 +82,6 @@ export function addDaysStr(dateStr: string, days: number): string {
 }
 
 // 오늘 기준으로 알림이 필요한 예약을 찾습니다.
-// kind: "week"(일주일 전) | "day"(하루 전) | "today"(당일)
 export type Reminder = { appt: Appointment; kind: "week" | "day" | "today" };
 
 export function getDueReminders(appts: Appointment[], today: string): Reminder[] {

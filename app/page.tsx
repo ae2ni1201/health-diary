@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import type { Session } from "@supabase/supabase-js";
 import {
   getRecords,
   addRecord,
@@ -16,12 +18,14 @@ import {
   type Appointment,
   type Reminder,
 } from "@/lib/appointments";
+import { signOut } from "@/lib/auth";
 import Calendar from "@/components/Calendar";
 import PainForm from "@/components/PainForm";
 import PainList from "@/components/PainList";
 import AppointmentForm from "@/components/AppointmentForm";
 import AppointmentList from "@/components/AppointmentList";
 import HospitalMap from "@/components/HospitalMap";
+import LoginScreen from "@/components/LoginScreen";
 
 const MIN_FONT = 16;
 const MAX_FONT = 30;
@@ -53,6 +57,8 @@ function reminderText(r: Reminder) {
 }
 
 export default function Home() {
+  const [session, setSession] = useState<Session | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [tab, setTab] = useState<"diary" | "map">("diary");
   const [records, setRecords] = useState<PainRecord[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -60,19 +66,15 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState("");
   const [fontPx, setFontPx] = useState(18);
-  // 아래 입력 화면 모드: null(버튼만) | "pain"(통증 기록) | "appointment"(예약 등록)
   const [addMode, setAddMode] = useState<null | "pain" | "appointment">(null);
 
-  // 통증 기록 + 예약을 모두 불러오고, 알림을 확인합니다.
+  // 통증 기록 + 예약 불러오기 + 알림 확인
   async function loadAll() {
     const [pains, appts] = await Promise.all([getRecords(), getAppointments()]);
     setRecords(pains);
     setAppointments(appts);
-
-    // 알림 확인 (일주일 전 / 하루 전 / 당일)
     const due = getDueReminders(appts, todayString());
     setReminders(due);
-    // 허용된 경우 브라우저 알림 (예약+종류별로 한 번만)
     if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
       for (const r of due) {
         const key = `geongang-ilgi.notified.${r.appt.id}.${r.kind}`;
@@ -88,12 +90,17 @@ export default function Home() {
     }
   }
 
-  // 처음 열릴 때
+  // 처음: 글자크기 + 오늘 날짜 + 로그인 상태 감지
   useEffect(() => {
     setSelectedDate(todayString());
     const savedFont = Number(window.localStorage.getItem("geongang-ilgi.fontPx"));
     if (savedFont) setFontPx(savedFont);
-    loadAll().finally(() => setLoading(false));
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setAuthLoading(false);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
+    return () => sub.subscription.unsubscribe();
   }, []);
 
   // 글자 크기 적용 + 저장
@@ -102,6 +109,18 @@ export default function Home() {
     window.localStorage.setItem("geongang-ilgi.fontPx", String(fontPx));
   }, [fontPx]);
 
+  // 로그인되면 데이터 불러오기, 로그아웃되면 비우기
+  useEffect(() => {
+    if (!session) {
+      setRecords([]);
+      setAppointments([]);
+      setReminders([]);
+      return;
+    }
+    setLoading(true);
+    loadAll().finally(() => setLoading(false));
+  }, [session]);
+
   function decFont() {
     setFontPx((p) => Math.max(MIN_FONT, p - 2));
   }
@@ -109,7 +128,12 @@ export default function Home() {
     setFontPx((p) => Math.min(MAX_FONT, p + 2));
   }
 
-  // 통증 기록 저장/삭제
+  async function handleLogout() {
+    setAddMode(null);
+    setTab("diary");
+    await signOut();
+  }
+
   async function handleAddPain(input: {
     bodyPart: string;
     painType: string;
@@ -124,49 +148,68 @@ export default function Home() {
     await deleteRecord(id);
     await loadAll();
   }
-
-  // 예약 저장/삭제
   async function handleAddAppt(input: { date: string; time: string; hospital: string; memo: string }) {
     await addAppointment(input);
     await loadAll();
-    setAddMode(null); // 저장 후 닫기
+    setAddMode(null);
   }
   async function handleDeleteAppt(id: string) {
     await deleteAppointment(id);
     await loadAll();
   }
 
-  // 달력 점 + 선택 날짜 데이터
   const datesWithRecords = new Set(records.map((r) => r.date));
   const datesWithAppt = new Set(appointments.map((a) => a.date));
   const selectedRecords = records.filter((r) => r.date === selectedDate);
   const selectedAppts = appointments.filter((a) => a.date === selectedDate);
 
-  const btnFont =
-    "rounded-xl border-2 border-green-600 px-5 py-2 text-2xl font-bold disabled:opacity-30";
+  // 로그인 확인 중
+  if (authLoading) {
+    return (
+      <main className="mx-auto max-w-2xl px-4 py-20 text-center text-xl text-gray-500">
+        불러오는 중...
+      </main>
+    );
+  }
+  // 로그인 안 됨 → 로그인 화면
+  if (!session) {
+    return <LoginScreen />;
+  }
+
+  const btnFont = "rounded-xl border-2 border-green-600 px-4 py-2 text-2xl font-bold disabled:opacity-30";
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-5">
-      {/* 글자 크기 (+/-) — 우측 상단 */}
-      <div className="mb-3 flex items-center justify-end gap-2">
-        <button
-          type="button"
-          onClick={decFont}
-          disabled={fontPx <= MIN_FONT}
-          aria-label="글자 작게"
-          className={`${btnFont} bg-white text-green-700 hover:bg-green-50`}
-        >
-          가－
-        </button>
-        <button
-          type="button"
-          onClick={incFont}
-          disabled={fontPx >= MAX_FONT}
-          aria-label="글자 크게"
-          className={`${btnFont} bg-green-600 text-white hover:bg-green-700`}
-        >
-          가＋
-        </button>
+      {/* 상단: 로그인 계정 + 글자크기(+/-) + 로그아웃 */}
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <span className="max-w-[40%] truncate text-sm text-gray-500">👤 {session.user.email}</span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={decFont}
+            disabled={fontPx <= MIN_FONT}
+            aria-label="글자 작게"
+            className={`${btnFont} bg-white text-green-700 hover:bg-green-50`}
+          >
+            가－
+          </button>
+          <button
+            type="button"
+            onClick={incFont}
+            disabled={fontPx >= MAX_FONT}
+            aria-label="글자 크게"
+            className={`${btnFont} bg-green-600 text-white hover:bg-green-700`}
+          >
+            가＋
+          </button>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="rounded-xl border-2 border-gray-300 px-3 py-2 text-base font-bold text-gray-600 hover:bg-gray-50"
+          >
+            로그아웃
+          </button>
+        </div>
       </div>
 
       {/* 탭: 건강일기 / 병원 지도 */}
@@ -291,7 +334,7 @@ export default function Home() {
         </>
       )}
 
-      {/* 작은 의료 면책 안내 (노란 박스 대신) */}
+      {/* 작은 의료 면책 안내 */}
       <footer className="mt-10 text-center text-sm text-gray-400">
         이 서비스는 의료 조언을 대신하지 않아요 · 위급 시 119
       </footer>

@@ -1,6 +1,6 @@
 // lib/painStore.ts
-// 통증 기록을 Supabase(인터넷 저장소)에 저장하고 불러오는 도우미 코드입니다.
-// 로그인이 없으므로, "기기 ID"(이 브라우저의 무작위 번호)로 내 기록만 구분합니다.
+// 통증 기록을 Supabase(인터넷 저장소)에 저장/불러오기 합니다.
+// 로그인한 계정(user_id)에 자동으로 연결되고, 각 계정은 자기 기록만 봅니다. (RLS)
 import { supabase } from "./supabase";
 
 // 통증 기록 한 개의 "모양(형태)"
@@ -24,17 +24,6 @@ export function ymd(y: number, m: number, d: number): string {
 export function todayString(): string {
   const n = new Date();
   return ymd(n.getFullYear(), n.getMonth(), n.getDate());
-}
-
-// 이 기기를 구분하는 무작위 번호를 가져옵니다. (없으면 새로 만들어 저장)
-export function getDeviceId(): string {
-  if (typeof window === "undefined") return "";
-  let id = window.localStorage.getItem("geongang-ilgi.deviceId");
-  if (!id) {
-    id = crypto.randomUUID();
-    window.localStorage.setItem("geongang-ilgi.deviceId", id);
-  }
-  return id;
 }
 
 // 데이터베이스 한 줄(row)의 모양
@@ -63,13 +52,11 @@ function toRecord(row: Row): PainRecord {
   };
 }
 
-// 내 기록을 모두 불러옵니다. (최신 날짜가 위로)
+// 내 기록을 모두 불러옵니다. (로그인 계정 기준, RLS가 자동으로 내 것만 걸러줌)
 export async function getRecords(): Promise<PainRecord[]> {
-  const deviceId = getDeviceId();
   const { data, error } = await supabase
     .from("pain_records")
     .select("*")
-    .eq("device_id", deviceId)
     .order("pain_date", { ascending: false })
     .order("created_at", { ascending: false });
   if (error) {
@@ -79,7 +66,7 @@ export async function getRecords(): Promise<PainRecord[]> {
   return (data as Row[]).map(toRecord);
 }
 
-// 새 기록을 저장합니다.
+// 새 기록을 저장합니다. (user_id는 DB가 자동으로 로그인 계정으로 채웁니다)
 export async function addRecord(input: {
   date: string;
   bodyPart: string;
@@ -88,9 +75,7 @@ export async function addRecord(input: {
   duration: string;
   memo: string;
 }): Promise<void> {
-  const deviceId = getDeviceId();
   const { error } = await supabase.from("pain_records").insert({
-    device_id: deviceId,
     pain_date: input.date,
     body_part: input.bodyPart,
     pain_type: input.painType || null,
