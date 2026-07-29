@@ -271,19 +271,10 @@ export default function Home() {
 
           {addMode === "pain" && (
             <section className="mt-6 rounded-3xl border-2 border-green-200 bg-white p-5 shadow-sm">
-              <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-2xl font-bold">
-                  <span className="text-green-700">{dateLabelKo(selectedDate)}</span> 통증 기록
-                </h2>
-                <button
-                  type="button"
-                  onClick={() => setAddMode(null)}
-                  className="rounded-lg border-2 border-gray-300 px-3 py-1 text-base font-bold text-gray-600 hover:bg-gray-50"
-                >
-                  닫기
-                </button>
-              </div>
-              <PainForm onAdd={handleAddPain} />
+              <h2 className="mb-4 text-2xl font-bold">
+                <span className="text-green-700">{dateLabelKo(selectedDate)}</span> 통증 기록
+              </h2>
+              <PainForm onAdd={handleAddPain} onCancel={() => setAddMode(null)} />
             </section>
           )}
 

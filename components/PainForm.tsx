@@ -40,7 +40,13 @@ type PainInput = {
 };
 
 // 날짜는 달력에서 고른 값을 쓰므로, 이 폼에는 날짜 입력이 없습니다.
-export default function PainForm({ onAdd }: { onAdd: (input: PainInput) => Promise<void> }) {
+export default function PainForm({
+  onAdd,
+  onCancel,
+}: {
+  onAdd: (input: PainInput) => Promise<void>;
+  onCancel: () => void;
+}) {
   const [bodyPart, setBodyPart] = useState("");
   const [customPart, setCustomPart] = useState(""); // "기타"일 때 직접 입력
   const [painType, setPainType] = useState("");
@@ -183,15 +189,24 @@ export default function PainForm({ onAdd }: { onAdd: (input: PainInput) => Promi
         />
       </div>
 
-      {/* 저장 버튼 */}
-      <button
-        type="button"
-        onClick={handleSave}
-        disabled={!canSave || saving}
-        className="w-full rounded-2xl bg-green-600 py-5 text-2xl font-bold text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-40"
-      >
-        {saving ? "저장 중..." : "저장하기"}
-      </button>
+      {/* 닫기 / 저장 버튼 (하단, 나란히) */}
+      <div className="flex gap-3">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="flex-1 rounded-2xl border-2 border-gray-300 py-4 text-xl font-bold text-gray-700 hover:bg-gray-50"
+        >
+          닫기
+        </button>
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={!canSave || saving}
+          className="flex-[2] rounded-2xl bg-green-600 py-4 text-xl font-bold text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {saving ? "저장 중..." : "저장하기"}
+        </button>
+      </div>
 
       {!canSave && !saved && (
         <p className="text-center text-lg text-gray-500">
