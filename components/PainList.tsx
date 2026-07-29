@@ -11,12 +11,16 @@ const LEVEL_INFO: Record<number, { label: string; color: string }> = {
   5: { label: "심함", color: "bg-red-600" },
 };
 
-// 날짜("2026-07-29")를 "2026년 7월 29일 (화)"처럼 보기 좋게 바꿉니다.
-function formatDate(d: string) {
-  const [y, m, day] = d.split("-").map(Number);
-  const date = new Date(y, m - 1, day);
-  const week = ["일", "월", "화", "수", "목", "금", "토"][date.getDay()];
-  return `${y}년 ${m}월 ${day}일 (${week})`;
+// 지속 시간 코드 → 보여줄 말
+const DURATION_LABEL: Record<string, string> = {
+  under5: "5분 이내",
+  "5to10": "5~10분",
+  over10: "10분 이상",
+};
+
+// 저장한 시각을 "오후 2:30"처럼 보여줍니다.
+function timeLabel(iso: string) {
+  return new Date(iso).toLocaleTimeString("ko-KR", { hour: "numeric", minute: "2-digit" });
 }
 
 export default function PainList({
@@ -26,14 +30,14 @@ export default function PainList({
   records: PainRecord[];
   onDelete: (id: string) => void;
 }) {
-  // 기록이 하나도 없을 때 보여줄 안내
+  // 이 날 기록이 하나도 없을 때
   if (records.length === 0) {
     return (
       <div className="rounded-2xl border-2 border-dashed border-gray-300 bg-white p-8 text-center">
         <p className="text-xl text-gray-500">
-          아직 기록이 없어요.
+          이 날은 기록이 없어요.
           <br />
-          위에서 오늘 아픈 곳을 적어보세요.
+          위에서 아픈 곳을 적어보세요.
         </p>
       </div>
     );
@@ -48,14 +52,19 @@ export default function PainList({
             key={r.id}
             className="rounded-2xl border-2 border-gray-200 bg-white p-5 shadow-sm"
           >
-            <p className="text-lg font-semibold text-gray-500">{formatDate(r.date)}</p>
-            <div className="mt-2 flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="text-2xl font-bold">{r.bodyPart}</span>
               <span
                 className={`rounded-full ${info.color} px-3 py-1 text-lg font-bold text-white`}
               >
                 {r.level} · {info.label}
               </span>
+              {r.duration && DURATION_LABEL[r.duration] && (
+                <span className="rounded-full bg-gray-100 px-3 py-1 text-lg font-semibold text-gray-700">
+                  ⏱ {DURATION_LABEL[r.duration]}
+                </span>
+              )}
+              <span className="ml-auto text-base text-gray-400">{timeLabel(r.createdAt)}</span>
             </div>
             {r.memo && <p className="mt-2 text-xl text-gray-800">📝 {r.memo}</p>}
             <button

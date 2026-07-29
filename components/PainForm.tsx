@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 
-// 자주 쓰는 "아픈 부위" 목록 — 큰 버튼으로 보여줍니다.
+// 자주 쓰는 "아픈 부위" 목록
 const BODY_PARTS = ["머리", "목", "어깨", "가슴", "배", "허리", "팔", "다리", "무릎", "기타"];
 
-// "아픈 정도" 1~5 — 숫자 + 쉬운 말 + 색깔
+// "아픈 정도" 1~5
 const LEVELS = [
   { value: 1, label: "약함", color: "bg-emerald-600 border-emerald-600" },
   { value: 2, label: "조금", color: "bg-green-600 border-green-600" },
@@ -14,21 +14,25 @@ const LEVELS = [
   { value: 5, label: "심함", color: "bg-red-600 border-red-600" },
 ];
 
-type PainInput = { date: string; bodyPart: string; level: number; memo: string };
+// "지속 시간" 3가지
+const DURATIONS = [
+  { value: "under5", label: "5분 이내" },
+  { value: "5to10", label: "5~10분" },
+  { value: "over10", label: "10분 이상" },
+];
 
+type PainInput = { bodyPart: string; level: number; duration: string; memo: string };
+
+// 날짜는 달력에서 고른 값을 쓰므로, 이 폼에는 날짜 입력이 없습니다.
 export default function PainForm({ onAdd }: { onAdd: (input: PainInput) => Promise<void> }) {
-  // 오늘 날짜 (예: "2026-07-29")
-  const today = new Date().toISOString().slice(0, 10);
-
-  const [date, setDate] = useState(today);
   const [bodyPart, setBodyPart] = useState("");
   const [customPart, setCustomPart] = useState(""); // "기타"일 때 직접 입력
   const [level, setLevel] = useState(0);
+  const [duration, setDuration] = useState("");
   const [memo, setMemo] = useState("");
   const [saved, setSaved] = useState(false);
-  const [saving, setSaving] = useState(false); // 저장 중(인터넷 전송 중) 표시
+  const [saving, setSaving] = useState(false);
 
-  // "기타"를 골랐으면 직접 입력한 값을 사용
   const finalPart = bodyPart === "기타" ? customPart.trim() : bodyPart;
   const canSave = finalPart !== "" && level >= 1;
 
@@ -36,14 +40,13 @@ export default function PainForm({ onAdd }: { onAdd: (input: PainInput) => Promi
     if (!canSave || saving) return;
     try {
       setSaving(true);
-      await onAdd({ date, bodyPart: finalPart, level, memo: memo.trim() });
-      // 저장 성공 후 입력칸 비우기
+      await onAdd({ bodyPart: finalPart, level, duration, memo: memo.trim() });
+      // 저장 후 입력칸 비우기
       setBodyPart("");
       setCustomPart("");
       setLevel(0);
+      setDuration("");
       setMemo("");
-      setDate(today);
-      // "저장됐어요" 안내를 잠깐 보여주기
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch {
@@ -57,7 +60,7 @@ export default function PainForm({ onAdd }: { onAdd: (input: PainInput) => Promi
 
   return (
     <div className="space-y-6">
-      {/* 1) 아픈 부위 고르기 */}
+      {/* 1) 아픈 부위 */}
       <div>
         <p className="mb-3 text-xl font-bold">1. 어디가 아프세요?</p>
         <div className="grid grid-cols-3 gap-3">
@@ -79,7 +82,6 @@ export default function PainForm({ onAdd }: { onAdd: (input: PainInput) => Promi
             );
           })}
         </div>
-        {/* "기타"를 고르면 직접 입력칸이 나타남 */}
         {bodyPart === "기타" && (
           <input
             type="text"
@@ -91,7 +93,7 @@ export default function PainForm({ onAdd }: { onAdd: (input: PainInput) => Promi
         )}
       </div>
 
-      {/* 2) 아픈 정도 고르기 */}
+      {/* 2) 아픈 정도 */}
       <div>
         <p className="mb-3 text-xl font-bold">2. 얼마나 아프세요?</p>
         <div className="grid grid-cols-5 gap-2">
@@ -116,15 +118,31 @@ export default function PainForm({ onAdd }: { onAdd: (input: PainInput) => Promi
         </div>
       </div>
 
-      {/* 3) 날짜 고르기 */}
+      {/* 3) 지속 시간 (선택) */}
       <div>
-        <p className="mb-3 text-xl font-bold">3. 언제 아프셨어요?</p>
-        <input
-          type="date"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-          className="w-full rounded-xl border-2 border-gray-300 p-4 text-xl"
-        />
+        <p className="mb-3 text-xl font-bold">
+          3. 얼마나 오래 아팠어요?{" "}
+          <span className="text-base font-normal text-gray-500">(안 골라도 돼요)</span>
+        </p>
+        <div className="grid grid-cols-3 gap-3">
+          {DURATIONS.map((dr) => {
+            const selected = duration === dr.value;
+            return (
+              <button
+                key={dr.value}
+                type="button"
+                onClick={() => setDuration(selected ? "" : dr.value)}
+                className={`${btnBase} ${
+                  selected
+                    ? "bg-blue-600 border-blue-600 text-white"
+                    : "bg-white border-gray-300 text-gray-800 hover:border-blue-400"
+                }`}
+              >
+                {dr.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* 4) 한 줄 메모 (선택) */}
@@ -152,7 +170,6 @@ export default function PainForm({ onAdd }: { onAdd: (input: PainInput) => Promi
         {saving ? "저장 중..." : "저장하기"}
       </button>
 
-      {/* 안내 문구 */}
       {!canSave && !saved && (
         <p className="text-center text-lg text-gray-500">
           아픈 부위와 정도를 고르면 저장할 수 있어요.

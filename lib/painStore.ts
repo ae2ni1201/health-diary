@@ -9,9 +9,21 @@ export type PainRecord = {
   date: string; // 아픈 날짜 (예: "2026-07-29")
   bodyPart: string; // 아픈 부위
   level: number; // 아픈 정도 (1~5)
+  duration: string; // 지속 시간 ("under5" | "5to10" | "over10" | "")
   memo: string; // 한 줄 메모
   createdAt: string; // 저장한 시각
 };
+
+// 날짜를 "2026-07-29" 형식 문자열로 만듭니다. (m은 0~11)
+export function ymd(y: number, m: number, d: number): string {
+  return `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
+
+// 오늘 날짜를 "2026-07-29" 형식으로 돌려줍니다.
+export function todayString(): string {
+  const n = new Date();
+  return ymd(n.getFullYear(), n.getMonth(), n.getDate());
+}
 
 // 이 기기를 구분하는 무작위 번호를 가져옵니다. (없으면 새로 만들어 저장)
 function getDeviceId(): string {
@@ -30,6 +42,7 @@ type Row = {
   pain_date: string;
   body_part: string;
   level: number;
+  duration: string | null;
   memo: string | null;
   created_at: string;
 };
@@ -41,6 +54,7 @@ function toRecord(row: Row): PainRecord {
     date: row.pain_date,
     bodyPart: row.body_part,
     level: row.level,
+    duration: row.duration ?? "",
     memo: row.memo ?? "",
     createdAt: row.created_at,
   };
@@ -67,6 +81,7 @@ export async function addRecord(input: {
   date: string;
   bodyPart: string;
   level: number;
+  duration: string;
   memo: string;
 }): Promise<void> {
   const deviceId = getDeviceId();
@@ -75,6 +90,7 @@ export async function addRecord(input: {
     pain_date: input.date,
     body_part: input.bodyPart,
     level: input.level,
+    duration: input.duration || null,
     memo: input.memo,
   });
   if (error) {
