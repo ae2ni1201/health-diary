@@ -16,7 +16,7 @@ const LEVELS = [
 
 type PainInput = { date: string; bodyPart: string; level: number; memo: string };
 
-export default function PainForm({ onAdd }: { onAdd: (input: PainInput) => void }) {
+export default function PainForm({ onAdd }: { onAdd: (input: PainInput) => Promise<void> }) {
   // 오늘 날짜 (예: "2026-07-29")
   const today = new Date().toISOString().slice(0, 10);
 
@@ -26,23 +26,31 @@ export default function PainForm({ onAdd }: { onAdd: (input: PainInput) => void 
   const [level, setLevel] = useState(0);
   const [memo, setMemo] = useState("");
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false); // 저장 중(인터넷 전송 중) 표시
 
   // "기타"를 골랐으면 직접 입력한 값을 사용
   const finalPart = bodyPart === "기타" ? customPart.trim() : bodyPart;
   const canSave = finalPart !== "" && level >= 1;
 
-  function handleSave() {
-    if (!canSave) return;
-    onAdd({ date, bodyPart: finalPart, level, memo: memo.trim() });
-    // 저장 후 입력칸 비우기
-    setBodyPart("");
-    setCustomPart("");
-    setLevel(0);
-    setMemo("");
-    setDate(today);
-    // "저장됐어요" 안내를 잠깐 보여주기
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+  async function handleSave() {
+    if (!canSave || saving) return;
+    try {
+      setSaving(true);
+      await onAdd({ date, bodyPart: finalPart, level, memo: memo.trim() });
+      // 저장 성공 후 입력칸 비우기
+      setBodyPart("");
+      setCustomPart("");
+      setLevel(0);
+      setMemo("");
+      setDate(today);
+      // "저장됐어요" 안내를 잠깐 보여주기
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch {
+      alert("저장에 실패했어요. 인터넷 연결을 확인하고 다시 시도해주세요.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   const btnBase = "rounded-xl border-2 py-4 text-xl font-semibold transition-colors";
@@ -138,10 +146,10 @@ export default function PainForm({ onAdd }: { onAdd: (input: PainInput) => void 
       <button
         type="button"
         onClick={handleSave}
-        disabled={!canSave}
+        disabled={!canSave || saving}
         className="w-full rounded-2xl bg-blue-600 py-5 text-2xl font-bold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
       >
-        저장하기
+        {saving ? "저장 중..." : "저장하기"}
       </button>
 
       {/* 안내 문구 */}

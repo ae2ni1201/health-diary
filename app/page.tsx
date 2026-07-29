@@ -8,22 +8,28 @@ import PainList from "@/components/PainList";
 export default function Home() {
   // 화면에 보여줄 통증 기록 목록
   const [records, setRecords] = useState<PainRecord[]>([]);
+  const [loading, setLoading] = useState(true); // 불러오는 중 표시
 
-  // 화면이 처음 열릴 때, 저장돼 있던 기록을 불러옵니다.
+  // 저장된 기록을 다시 불러옵니다.
+  async function reload() {
+    setRecords(await getRecords());
+  }
+
+  // 화면이 처음 열릴 때 기록을 불러옵니다.
   useEffect(() => {
-    setRecords(getRecords());
+    reload().finally(() => setLoading(false));
   }, []);
 
   // 새 기록 저장하기
-  function handleAdd(input: { date: string; bodyPart: string; level: number; memo: string }) {
-    addRecord(input);
-    setRecords(getRecords()); // 목록 새로고침
+  async function handleAdd(input: { date: string; bodyPart: string; level: number; memo: string }) {
+    await addRecord(input);
+    await reload(); // 목록 새로고침
   }
 
   // 기록 삭제하기
-  function handleDelete(id: string) {
-    deleteRecord(id);
-    setRecords(getRecords());
+  async function handleDelete(id: string) {
+    await deleteRecord(id);
+    await reload();
   }
 
   return (
@@ -53,7 +59,11 @@ export default function Home() {
         <h2 className="mb-4 text-2xl font-bold">
           내 기록 <span className="text-xl text-gray-500">({records.length}개)</span>
         </h2>
-        <PainList records={records} onDelete={handleDelete} />
+        {loading ? (
+          <p className="py-8 text-center text-xl text-gray-500">기록을 불러오는 중...</p>
+        ) : (
+          <PainList records={records} onDelete={handleDelete} />
+        )}
       </section>
 
       {/* 꼬리말 */}
