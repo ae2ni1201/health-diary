@@ -11,6 +11,16 @@ const LEVEL_INFO: Record<number, { label: string; color: string }> = {
   5: { label: "심함", color: "bg-red-600" },
 };
 
+// 통증 종류 코드 → 보여줄 말
+const PAIN_TYPE_LABEL: Record<string, string> = {
+  aching: "쑤심",
+  stabbing: "콕콕",
+  throbbing: "욱신",
+  sharp: "찌릿",
+  stiff: "뻐근",
+  burning: "화끈",
+};
+
 // 지속 시간 코드 → 보여줄 말
 const DURATION_LABEL: Record<string, string> = {
   under5: "5분 이내",
@@ -33,11 +43,11 @@ export default function PainList({
   // 이 날 기록이 하나도 없을 때
   if (records.length === 0) {
     return (
-      <div className="rounded-2xl border-2 border-dashed border-gray-300 bg-white p-8 text-center">
+      <div className="rounded-2xl border-2 border-dashed border-green-300 bg-white p-8 text-center">
         <p className="text-xl text-gray-500">
           이 날은 기록이 없어요.
           <br />
-          위에서 아픈 곳을 적어보세요.
+          아래에서 아픈 곳을 적어보세요.
         </p>
       </div>
     );
@@ -50,7 +60,7 @@ export default function PainList({
         return (
           <li
             key={r.id}
-            className="rounded-2xl border-2 border-gray-200 bg-white p-5 shadow-sm"
+            className="rounded-2xl border-2 border-green-200 bg-white p-5 shadow-sm"
           >
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-2xl font-bold">{r.bodyPart}</span>
@@ -59,6 +69,11 @@ export default function PainList({
               >
                 {r.level} · {info.label}
               </span>
+              {r.painType && PAIN_TYPE_LABEL[r.painType] && (
+                <span className="rounded-full bg-green-100 px-3 py-1 text-lg font-semibold text-green-800">
+                  💢 {PAIN_TYPE_LABEL[r.painType]}
+                </span>
+              )}
               {r.duration && DURATION_LABEL[r.duration] && (
                 <span className="rounded-full bg-gray-100 px-3 py-1 text-lg font-semibold text-gray-700">
                   ⏱ {DURATION_LABEL[r.duration]}

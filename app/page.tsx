@@ -12,12 +12,9 @@ import Calendar from "@/components/Calendar";
 import PainForm from "@/components/PainForm";
 import PainList from "@/components/PainList";
 
-// 글자 크기 단계 (어르신 시력 배려)
-const FONT_LEVELS = [
-  { label: "보통", px: 18 },
-  { label: "크게", px: 21 },
-  { label: "아주 크게", px: 24 },
-];
+// 글자 크기 최소/최대 (px)
+const MIN_FONT = 16;
+const MAX_FONT = 30;
 
 // "2026-07-29" → "7월 29일 (수)"
 function dateLabelKo(dateStr: string) {
@@ -38,7 +35,7 @@ export default function Home() {
     setRecords(await getRecords());
   }
 
-  // 화면이 처음 열릴 때: 오늘 날짜 선택 + 저장된 글자크기 적용 + 기록 불러오기
+  // 처음 열릴 때: 오늘 날짜 선택 + 저장된 글자크기 적용 + 기록 불러오기
   useEffect(() => {
     setSelectedDate(todayString());
     const savedFont = Number(window.localStorage.getItem("geongang-ilgi.fontPx"));
@@ -46,15 +43,23 @@ export default function Home() {
     reload().finally(() => setLoading(false));
   }, []);
 
-  // 글자 크기 적용 (화면 전체 글씨가 커짐) + 저장
+  // 글자 크기 적용 (화면 전체 글씨) + 저장
   useEffect(() => {
     document.documentElement.style.fontSize = `${fontPx}px`;
     window.localStorage.setItem("geongang-ilgi.fontPx", String(fontPx));
   }, [fontPx]);
 
+  function decFont() {
+    setFontPx((p) => Math.max(MIN_FONT, p - 2));
+  }
+  function incFont() {
+    setFontPx((p) => Math.min(MAX_FONT, p + 2));
+  }
+
   // 새 기록 저장 (날짜는 달력에서 고른 날)
   async function handleAdd(input: {
     bodyPart: string;
+    painType: string;
     level: number;
     duration: string;
     memo: string;
@@ -75,28 +80,32 @@ export default function Home() {
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-6">
-      {/* 글자 크기 조절 (상단) */}
-      <div className="mb-4 flex flex-wrap items-center justify-center gap-2 rounded-2xl border-2 border-gray-200 bg-white p-3">
-        <span className="mr-1 text-base font-bold text-gray-600">🔠 글자 크기</span>
-        {FONT_LEVELS.map((f) => (
-          <button
-            key={f.px}
-            type="button"
-            onClick={() => setFontPx(f.px)}
-            className={`rounded-xl border-2 px-4 py-2 font-bold ${
-              fontPx === f.px
-                ? "bg-blue-600 border-blue-600 text-white"
-                : "bg-white border-gray-300 text-gray-700"
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
+      {/* 글자 크기 조절 (상단, +/-) */}
+      <div className="mb-4 flex flex-wrap items-center justify-center gap-3 rounded-2xl border-2 border-green-200 bg-white p-3">
+        <span className="text-base font-bold text-gray-600">🔠 글자 크기</span>
+        <button
+          type="button"
+          onClick={decFont}
+          disabled={fontPx <= MIN_FONT}
+          aria-label="글자 작게"
+          className="rounded-xl border-2 border-green-600 bg-white px-5 py-2 text-2xl font-bold text-green-700 hover:bg-green-50 disabled:opacity-30"
+        >
+          가－
+        </button>
+        <button
+          type="button"
+          onClick={incFont}
+          disabled={fontPx >= MAX_FONT}
+          aria-label="글자 크게"
+          className="rounded-xl border-2 border-green-600 bg-green-600 px-5 py-2 text-2xl font-bold text-white hover:bg-green-700 disabled:opacity-30"
+        >
+          가＋
+        </button>
       </div>
 
       {/* 제목 */}
       <header className="mb-4 text-center">
-        <h1 className="text-3xl font-extrabold text-blue-700">📔 건강일기</h1>
+        <h1 className="text-3xl font-extrabold text-green-700">📔 건강일기</h1>
         <p className="mt-1 text-lg text-gray-600">날짜를 눌러 통증을 기록해요</p>
       </header>
 
@@ -118,16 +127,8 @@ export default function Home() {
             datesWithRecords={datesWithRecords}
           />
 
-          {/* 기록 작성 (선택한 날짜로 저장) */}
-          <section className="mt-6 rounded-3xl border-2 border-gray-200 bg-white p-6 shadow-sm">
-            <h2 className="mb-5 text-2xl font-bold">
-              <span className="text-blue-700">{dateLabelKo(selectedDate)}</span> 기록하기
-            </h2>
-            <PainForm onAdd={handleAdd} />
-          </section>
-
-          {/* 선택한 날짜의 기록 목록 */}
-          <section className="mt-8">
+          {/* 선택한 날짜의 기록 (달력 바로 아래) */}
+          <section className="mt-6">
             <h2 className="mb-4 text-2xl font-bold">
               {dateLabelKo(selectedDate)} 기록{" "}
               <span className="text-xl text-gray-500">({selectedRecords.length}개)</span>
@@ -137,6 +138,14 @@ export default function Home() {
             ) : (
               <PainList records={selectedRecords} onDelete={handleDelete} />
             )}
+          </section>
+
+          {/* 기록 추가 폼 (맨 아래) */}
+          <section className="mt-8 rounded-3xl border-2 border-green-200 bg-white p-5 shadow-sm sm:p-6">
+            <h2 className="mb-5 text-2xl font-bold">
+              <span className="text-green-700">{dateLabelKo(selectedDate)}</span> 기록하기
+            </h2>
+            <PainForm onAdd={handleAdd} />
           </section>
         </>
       )}

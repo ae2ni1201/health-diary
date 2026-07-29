@@ -42,14 +42,14 @@ export default function Calendar({
   }
 
   return (
-    <div className="rounded-3xl border-2 border-gray-200 bg-white p-4 shadow-sm">
+    <div className="rounded-3xl border-2 border-green-200 bg-white p-4 shadow-sm">
       {/* 월 이동 */}
       <div className="mb-3 flex items-center justify-between">
         <button
           type="button"
           onClick={prevMonth}
           aria-label="이전 달"
-          className="rounded-xl px-4 py-2 text-3xl font-bold text-gray-500 hover:bg-gray-100"
+          className="rounded-xl px-4 py-2 text-3xl font-bold text-gray-500 hover:bg-green-50"
         >
           ‹
         </button>
@@ -60,7 +60,7 @@ export default function Calendar({
           type="button"
           onClick={nextMonth}
           aria-label="다음 달"
-          className="rounded-xl px-4 py-2 text-3xl font-bold text-gray-500 hover:bg-gray-100"
+          className="rounded-xl px-4 py-2 text-3xl font-bold text-gray-500 hover:bg-green-50"
         >
           ›
         </button>
@@ -100,9 +100,9 @@ export default function Calendar({
                 className={
                   "flex h-11 w-11 items-center justify-center rounded-full text-xl " +
                   (isSelected
-                    ? "bg-blue-600 font-bold text-white"
+                    ? "bg-green-600 font-bold text-white"
                     : isToday
-                      ? "border-2 border-blue-400 font-bold text-blue-600"
+                      ? "border-2 border-green-500 font-bold text-green-700"
                       : dow === 0
                         ? "text-red-500"
                         : dow === 6

@@ -8,6 +8,7 @@ export type PainRecord = {
   id: string; // 고유 번호
   date: string; // 아픈 날짜 (예: "2026-07-29")
   bodyPart: string; // 아픈 부위
+  painType: string; // 통증 종류 ("aching" 등, "" 가능)
   level: number; // 아픈 정도 (1~5)
   duration: string; // 지속 시간 ("under5" | "5to10" | "over10" | "")
   memo: string; // 한 줄 메모
@@ -41,6 +42,7 @@ type Row = {
   id: string;
   pain_date: string;
   body_part: string;
+  pain_type: string | null;
   level: number;
   duration: string | null;
   memo: string | null;
@@ -53,6 +55,7 @@ function toRecord(row: Row): PainRecord {
     id: row.id,
     date: row.pain_date,
     bodyPart: row.body_part,
+    painType: row.pain_type ?? "",
     level: row.level,
     duration: row.duration ?? "",
     memo: row.memo ?? "",
@@ -80,6 +83,7 @@ export async function getRecords(): Promise<PainRecord[]> {
 export async function addRecord(input: {
   date: string;
   bodyPart: string;
+  painType: string;
   level: number;
   duration: string;
   memo: string;
@@ -89,6 +93,7 @@ export async function addRecord(input: {
     device_id: deviceId,
     pain_date: input.date,
     body_part: input.bodyPart,
+    pain_type: input.painType || null,
     level: input.level,
     duration: input.duration || null,
     memo: input.memo,
